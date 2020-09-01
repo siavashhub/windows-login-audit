@@ -49,3 +49,4 @@ $script_block= {
 Invoke-Command -ComputerName $h -Credential $cred -ScriptBlock $script_block -ArgumentList $StartTime
 
 }} | Select-Object TimeCreated, User, ServerName, IPAddress, Action | Export-Csv -Path $log_path -NoTypeInformation 
+
