@@ -1,18 +1,23 @@
-$script1= {
-[array]$ServersToQuery = (hostname)
+$cred= Get-Credential
+[array]$all_hosts = "Host-01","Host-02","Host-03","Host-04","Host-05"
+$log_path = "C:\host-audit-20200901-allhosts.csv"
 [datetime]$StartTime = "May 1, 2020"
 
-    foreach ($Server in $ServersToQuery) {
+$script_block= {
+    param($StartTime)
+    $Servers = (hostname)
+
+    foreach ($Server in $Servers) {
 
         $LogFilter = @{
             LogName = 'Microsoft-Windows-TerminalServices-LocalSessionManager/Operational'
             ID = 21, 23, 24, 25
             StartTime = $StartTime
-            }
+        }
 
         $AllEntries = Get-WinEvent -FilterHashtable $LogFilter -ComputerName $Server
 
-        $AllEntries | Foreach { 
+        $AllEntries | ForEach-Object { 
             $entry = [xml]$_.ToXml()
             [array]$Output += New-Object PSObject -Property @{
                 TimeCreated = $_.TimeCreated
@@ -20,31 +25,27 @@ $script1= {
                 IPAddress = $entry.Event.UserData.EventXML.Address
                 EventID = $entry.Event.System.EventID
                 ServerName = $Server
-                }        
-            } 
+            }        
+        } 
 
     }
 
-    $FilteredOutput += $Output | Select TimeCreated, User, ServerName, IPAddress, @{Name='Action';Expression={
-                if ($_.EventID -eq '21'){"logon"}
-                if ($_.EventID -eq '22'){"Shell start"}
-                if ($_.EventID -eq '23'){"logoff"}
-                if ($_.EventID -eq '24'){"disconnected"}
-                if ($_.EventID -eq '25'){"reconnection"}
-                }
-            }
+    $FilteredOutput += $Output | Select-Object TimeCreated, User, ServerName, IPAddress, 
+    @{Name='Action';Expression={
+        if ($_.EventID -eq '21'){"logon"}
+        if ($_.EventID -eq '22'){"Shell start"}
+        if ($_.EventID -eq '23'){"logoff"}
+        if ($_.EventID -eq '24'){"disconnected"}
+        if ($_.EventID -eq '25'){"reconnection"}
+        }
+    }
 
-    $Date = (Get-Date -Format s) -replace ":", "."
-
-    $FilteredOutput | Sort TimeCreated 
+    $FilteredOutput | Sort-Object TimeCreated 
 
 }
-$cred= Get-Credential
 
-[array]$svs = "Host-01","Host-02","Host-03","Host-04","Host-05"
+&{foreach ($h in $all_hosts) {
 
-&{foreach ($sv in $svs) {
+Invoke-Command -ComputerName $h -Credential $cred -ScriptBlock $script_block -ArgumentList $StartTime
 
-Invoke-Command -ComputerName $sv -Credential $cred -ScriptBlock $script1
-
-}} | Export-Csv -Path "C:\host-audit-20200901-allhosts.csv"
+}} | Select-Object TimeCreated, User, ServerName, IPAddress, Action | Export-Csv -Path $log_path -NoTypeInformation 
