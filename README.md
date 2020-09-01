@@ -1,4 +1,5 @@
-# rdslogcollector
+# windows-login-audit
+(Tested with windows 2016)
 Run this on your domain controller  
 You need to provide bellow options:  
 1- Time for the log  
